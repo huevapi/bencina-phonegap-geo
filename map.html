@@ -1,0 +1,123 @@
+<html>
+<head>
+<meta name="viewport" content="initial-scale=1.0, user-scalable=no"/>
+<script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=true"></script>
+<script src="http://code.jquery.com/jquery-1.6.1.min.js"></script>
+<script type="text/javascript">
+function initialize() {
+	var latlng = new google.maps.LatLng(-33.397968, -70.581037);
+
+	var myOptions = {
+		zoom: 12,
+		center: latlng,
+		mapTypeId: google.maps.MapTypeId.ROADMAP
+	};
+
+	return new google.maps.Map(document.getElementById("map_canvas"), myOptions);
+}
+
+$(document).ready(function() {
+	var map = initialize();
+	var markers = new Array();
+	var key = 'bbac3c8fcd408dc8702047e7bead24ddb5af18211c2c0b2ad078f4eae307d6b6';
+	var infoWindow = new google.maps.InfoWindow;
+
+	$('#comunas').change(function(){
+		loadStations({'comuna': $(this).val()});
+	});
+	
+	$.ajax({
+		url: 'http://kaipi.me/gasoline/counties?api_key=' + key,
+		dataType: 'json',
+		success: function(data) {
+			$.each(data.counties, function(index, county) {
+				var option = '<option value="' + county.id + '">' + county.name + '</option>';
+				$('#comunas').append(option);
+			})
+		}
+	});
+
+	function loadStations(filtro) {
+		var param = '';
+
+		if (filtro.comuna > 0){
+			param += '&county_id='+filtro.comuna;
+		}
+
+		for (i in markers){
+			markers[i].setMap(null);
+		}
+
+		markers = new Array();
+
+		$.ajax({
+			url : 'http://kaipi.me/gasoline/stations?api_key=' + key + param,
+			dataType: 'json',
+			success: function(stations) {
+				var southWest = null;
+				var northEast = null;
+
+				$.each(stations.stations, function(index, station) {
+					var latLng = new google.maps.LatLng(station.lat, station.lng);
+					var marker = new google.maps.Marker({'position': latLng, 'map': map});
+					markers.push(marker);
+					var html = '<div style="width: 400px, height: 200px"><strong>Direcci&oacute;n: ' + station.address + '</strong>';
+					html += '<div>93 Oct: $ ' + station.price_93 + '</div>';
+					html += '<div>95 Oct: $ ' + station.price_95 + '</div>';
+					html += '<div>97 Oct: $ ' + station.price_97 + '</div>';
+					html += '<div>Diesel: $ ' + station.price_diesel + '</div></div>';
+
+					google.maps.event.addListener(marker, 'click', function() {
+						infoWindow.setContent(html);
+						infoWindow.open(map, marker);
+					});
+
+					southWest = getSouthWest(southWest, latLng);
+					northEast = getNorthEast(northEast, latLng);
+				})
+
+				var myLatLngBounds = new google.maps.LatLngBounds(southWest, northEast);
+				map.fitBounds(myLatLngBounds);
+				map.setCenter(myLatLngBounds.getCenter());
+			}
+		})
+	}
+});
+
+function getSouthWest(coordinates1, coordinates2) {
+	if (coordinates1 == null && coordinates2 == null) {
+		return null;
+	} else if (coordinates1 != null && coordinates2 == null) {
+		return coordinates1;
+	} else if (coordinates1 == null && coordinates2 != null) {
+		return coordinates2;
+	} else {
+		var latlng = new google.maps.LatLng(Math.min(coordinates1.lat(), coordinates2.lat()), Math.min(coordinates1.lng(), coordinates2.lng()));
+		return latlng;
+	}
+}
+
+function getNorthEast(coordinates1, coordinates2) {
+	if (coordinates1 == null && coordinates2 == null) {
+		return null;
+	} else if (coordinates1 != null && coordinates2 == null) {
+		return coordinates1;
+	} else if (coordinates1 == null && coordinates2 != null) {
+		return coordinates2;
+	} else {
+		var latlng = new google.maps.LatLng(Math.max(coordinates1.lat(), coordinates2.lat()), Math.max(coordinates1.lng(), coordinates2.lng()));
+		return latlng;
+	}
+}
+</script>
+</head>
+<body>
+	<div id="filtros">
+		<select id="comunas">
+			<option value="-1">Todas</option>
+		</select>
+	</div>
+	<div id="map_canvas" style="width:400px; height:700px">
+	</div>
+</body>
+</html>
